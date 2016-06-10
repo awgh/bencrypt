@@ -1,0 +1,2 @@
+go get golang.org/x/crypto/curve25519
+go get golang.org/x/crypto/hkdf
