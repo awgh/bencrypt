@@ -1,43 +1,22 @@
-package bencrypt
+package rsa
 
 import (
 	"bytes"
 	"testing"
+
+	"github.com/awgh/bencrypt/bc"
 )
 
 var (
-	rsaCrypt CryptoAPI = new(RSA)
-	eccCrypt CryptoAPI = new(ECC)
+	rsaCrypt bc.KeyPair = new(KeyPair)
 )
 
-func Test_pkcs7Pad_1(t *testing.T) {
-	a := make([]byte, 14)
-	b := make([]byte, 16) // aes.BlockSize == 16
-	c := make([]byte, 250)
-
-	a, _ = pkcs7Pad(a, 16)
-	b, _ = pkcs7Pad(a, 16)
-	c, _ = pkcs7Pad(a, 16)
-
-	if len(a) != 16 {
-		t.Error("pkcs7Pad did not pad")
-	}
-	if len(b) != 32 {
-		t.Error("pkcs7Pad padded incorrectly")
-	}
-	if len(c)%16 != 0 {
-		t.Error("pkcs7Pad padded incorrectly on mult>1")
-	}
-
-	t.Log("pkcs7Pad tests passed")
-}
-
 func Test_B64PublicKey_RSA(t *testing.T) {
-	pubkey, err := rsaCrypt.B64toPublicKey(pubkeyb64)
-	if err != nil {
+	pubkey := new(PubKey)
+	if err := pubkey.FromB64(pubkeyb64); err != nil {
 		t.Error(err.Error())
 	}
-	b64 := rsaCrypt.B64fromPublicKey(pubkey)
+	b64 := pubkey.ToB64()
 	if pubkeyb64 != b64 {
 		t.Error("base64 public key conversion test failed")
 	} else {
@@ -45,25 +24,11 @@ func Test_B64PublicKey_RSA(t *testing.T) {
 	}
 }
 
-func Test_b64PublicKey_ECC(t *testing.T) {
-	pubkey, err := eccCrypt.B64toPublicKey(pubkeyb64_ecc)
-	if err != nil {
-		t.Error(err.Error())
-	}
-	b64 := eccCrypt.B64fromPublicKey(pubkey)
-	if pubkeyb64_ecc != b64 {
-		t.Error("base64 public key conversion test failed")
-	} else {
-		t.Log("base64 public key conversion test passed")
-	}
-}
-
 func Test_b64PrivateKey_RSA(t *testing.T) {
-	err := rsaCrypt.B64toPrivateKey(privkeyb64)
-	if err != nil {
+	if err := rsaCrypt.FromB64(privkeyb64); err != nil {
 		t.Error(err.Error())
 	}
-	b64 := rsaCrypt.B64fromPrivateKey()
+	b64 := rsaCrypt.ToB64()
 	if privkeyb64 != b64 {
 		t.Error("base64 private key conversion test failed")
 	} else {
@@ -71,47 +36,20 @@ func Test_b64PrivateKey_RSA(t *testing.T) {
 	}
 }
 
-func Test_b64PrivateKey_ECC(t *testing.T) {
-	err := eccCrypt.B64toPrivateKey(pubprivkeyb64_ecc)
-	if err != nil {
-		t.Error(err.Error())
-	}
-	b64 := eccCrypt.B64fromPrivateKey()
-	if pubprivkeyb64_ecc != b64 {
-		t.Error("base64 private key conversion test failed")
-	} else {
-		t.Log("base64 private key conversion test passed")
-	}
-}
-
-func Test_generateKeys_ECC(t *testing.T) {
-	// save old key so other tests don't break
-	oldkey := eccCrypt.B64fromPrivateKey()
-
-	eccCrypt.GenerateKey()
-	t.Log("b64 pubpriv: " + eccCrypt.B64fromPrivateKey())
-	pubkey := eccCrypt.GetPubKey()
-	b64 := eccCrypt.B64fromPublicKey(pubkey)
-	t.Log(b64)
-
-	// restore old key
-	eccCrypt.B64toPrivateKey(oldkey)
-}
-
 func Test_encryptDecrypt_RSA(t *testing.T) {
-	cleartext, err := GenerateRandomBytes(151)
+	cleartext, err := bc.GenerateRandomBytes(151)
 	if err != nil {
 		t.Error(err.Error())
 	}
-	pubkey, err := rsaCrypt.B64toPublicKey(pubkeyb64)
-	if err != nil {
+	pubkey := new(PubKey)
+	if err := pubkey.FromB64(pubkeyb64); err != nil {
 		t.Error(err.Error())
 	}
 	ciphertext, err := rsaCrypt.EncryptMessage(cleartext, pubkey)
 	if err != nil {
 		t.Error(err.Error())
 	}
-	err = rsaCrypt.B64toPrivateKey(privkeyb64)
+	err = rsaCrypt.FromB64(privkeyb64)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -119,35 +57,6 @@ func Test_encryptDecrypt_RSA(t *testing.T) {
 	if err != nil {
 		t.Error(err.Error())
 	}
-
-	if bytes.Equal(cleartext, recovered[:len(cleartext)]) {
-		t.Log("encrypt decrypt test passed")
-	} else {
-		t.Error("encrypt decrypt test failed")
-	}
-}
-
-func Test_encryptDecrypt_ECC(t *testing.T) {
-	cleartext, err := GenerateRandomBytes(151)
-	if err != nil {
-		t.Error(err.Error())
-	}
-	pubkey, err := eccCrypt.B64toPublicKey(pubkeyb64_ecc)
-	if err != nil {
-		t.Error(err.Error())
-	}
-	ciphertext, err := eccCrypt.EncryptMessage(cleartext, pubkey)
-	if err != nil {
-		t.Error(err.Error())
-	}
-	recovered, err := eccCrypt.DecryptMessage(ciphertext)
-	if err != nil {
-		t.Error(err.Error())
-	}
-
-	//if len(cleartext) != len(recovered) {
-	//	t.Error("encrypt decrypt lost the length")
-	//}
 
 	if bytes.Equal(cleartext, recovered[:len(cleartext)]) {
 		t.Log("encrypt decrypt test passed")
@@ -485,8 +394,3 @@ var privkey3b64 = "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlKS2dJQkFBS0NBZ
 	"RnVkV3ZTWHBRWmNQQjV4cVNLSXpPWTBjYzNuNlBzbgphMTZxQWZwZE1sYkpaZ1F3" +
 	"elMrZ3JsNW9hSW04MXUwT2NFZWRYZGljV2wremVqR21BZmZFYkVySEYzQ2VlUT09" +
 	"Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg=="
-
-// ECC TEST KEYS
-var pubprivkeyb64_ecc = "Tcksa18txiwMEocq7NXdeMwz6PPBD+nxCjb/WCtxq1+dln3M3IaOmg+YfTIbBpk+jIbZZZiT+4CoeFzaJGEWmg=="
-var pubkeyb64_ecc = "Tcksa18txiwMEocq7NXdeMwz6PPBD+nxCjb/WCtxq18="
-var privkeyb64_ecc = "nZZ9zNyGjpoPmH0yGwaZPoyG2WWYk/uAqHhc2iRhFpo="

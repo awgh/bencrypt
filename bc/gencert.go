@@ -8,7 +8,7 @@
 // stolen from google sample code
 // todo: parameterize pwd/filenames
 
-package bencrypt
+package bc
 
 import (
 	"crypto/ecdsa"
@@ -62,6 +62,21 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	}
 }
 
+// InitSSL : Generate you some SSL cert/key, only if the named files don't exist
+func InitSSL(certfile string, keyfile string, useECC bool) {
+	haveCert := true
+	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
+		haveCert = false
+	}
+	if _, err := os.Stat(certfile); os.IsNotExist(err) {
+		haveCert = false
+	}
+	if !haveCert {
+		GenerateSSLCert(certfile, keyfile, useECC)
+	}
+}
+
+// GenerateSSLCert : Generate you some SSL cert/key
 func GenerateSSLCert(certfile string, keyfile string, eccMode bool) {
 	var priv interface{}
 	var err error

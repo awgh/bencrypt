@@ -1,4 +1,4 @@
-package bencrypt
+package rsa
 
 /*
 -= Notes on the crypto =-
@@ -34,23 +34,79 @@ import (
 	"errors"
 	"io"
 	"log"
+
+	"github.com/awgh/bencrypt/bc"
 )
 
-type RSA struct {
+// PubKey : Implements bc.PubKey interface
+type PubKey struct {
+	pubkey *rsa.PublicKey
+}
+
+// ToB64 : Returns Public Key as a Base64 encoded string
+func (e *PubKey) ToB64() string {
+	return base64.StdEncoding.EncodeToString(e.ToBytes())
+}
+
+// FromB64 : Sets Public Key from a Base64 encoded string
+func (e *PubKey) FromB64(s string) error {
+	pubkeypem, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return err
+	}
+	return e.FromBytes(pubkeypem)
+}
+
+// ToBytes : Returns Public Key as bytes (PEM text)
+func (e *PubKey) ToBytes() []byte {
+	var b pem.Block
+	b.Type = "PUBLIC KEY"
+	b.Bytes, _ = x509.MarshalPKIXPublicKey(e.pubkey)
+	data := pem.EncodeToMemory(&b)
+	return data
+}
+
+// FromBytes : Sets Public Key from bytes (PEM text)
+func (e *PubKey) FromBytes(b []byte) error {
+	p, _ := pem.Decode(b)
+	if p != nil && p.Type == "PUBLIC KEY" {
+		pub, err := x509.ParsePKIXPublicKey(p.Bytes)
+		if err != nil {
+			return err
+		}
+		e.pubkey = pub.(*rsa.PublicKey)
+		if e.pubkey == nil {
+			return errors.New("Nil Public Key in PubKey.FromBytes")
+		}
+		return nil
+	}
+	return errors.New("No Public Key Found in PubKey.FromBytes")
+}
+
+// Clone : Returns a new PubKey of the same type as this one
+func (e *PubKey) Clone() bc.PubKey {
+	return new(PubKey)
+}
+
+// KeyPair for RSA : Bencrypt Implementation of a RSA-4096,AES-CBC-256,HMAC-SHA-256 system
+type KeyPair struct {
 	privkey *rsa.PrivateKey
-	pubkey  *rsa.PublicKey
+	pubkey  *PubKey
 	keyHash []byte
 }
 
-func (r *RSA) GetName() string {
+// GetName : Returns the common language name for this cryptosystem
+func (r *KeyPair) GetName() string {
 	return "RSA-4096,AES-CBC-256,HMAC-SHA-256"
 }
 
-func (r *RSA) GetPubKey() interface{} {
+// GetPubKey : Returns the Public portion of this KeyPair
+func (r *KeyPair) GetPubKey() bc.PubKey {
 	return r.pubkey
 }
 
-func (r *RSA) precompute() {
+// Precompute : Precomputes key
+func (r *KeyPair) Precompute() {
 	keybytes, _ := x509.MarshalPKIXPublicKey(r.privkey)
 	sha := sha256.New()
 	sha.Write(keybytes)
@@ -62,20 +118,25 @@ func (r *RSA) precompute() {
 		log.Fatal(err.Error())
 	}
 
-	r.pubkey = &r.privkey.PublicKey
+	if r.pubkey == nil {
+		r.pubkey = new(PubKey)
+	}
+	r.pubkey.pubkey = &r.privkey.PublicKey
 }
 
-func (r *RSA) GenerateKey() {
+// GenerateKey : Generates a new keypair inside this KeyPair object
+func (r *KeyPair) GenerateKey() {
 	p, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 	r.privkey = p
 
-	r.precompute()
+	r.Precompute()
 }
 
-func (r *RSA) B64fromPrivateKey() string {
+// ToB64 : Returns the private portion of this keypair as a Base64-encoded string
+func (r *KeyPair) ToB64() string {
 	var b pem.Block
 	b.Type = "RSA PRIVATE KEY"
 	b.Bytes = x509.MarshalPKCS1PrivateKey(r.privkey)
@@ -84,8 +145,8 @@ func (r *RSA) B64fromPrivateKey() string {
 	return s
 }
 
-// Expecting base64-encoded single PEM block containing private key
-func (r *RSA) B64toPrivateKey(s string) error {
+// FromB64 : Sets the private portion of this keypair from a Base64-encoded string
+func (r *KeyPair) FromB64(s string) error {
 	dec, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return err
@@ -97,45 +158,14 @@ func (r *RSA) B64toPrivateKey(s string) error {
 			return err
 		}
 		r.privkey = priv
-		r.precompute()
+		r.Precompute()
 		return nil
 	}
 	return errors.New("No Private Key Found.")
 }
 
-func (r *RSA) B64fromPublicKey(pubkey interface{}) string {
-	public, ok := pubkey.(*rsa.PublicKey)
-	if !ok {
-		log.Fatal("*rsa.PublicKey type assertion failed - your code is broken.")
-	}
-
-	var b pem.Block
-	b.Type = "PUBLIC KEY"
-	b.Bytes, _ = x509.MarshalPKIXPublicKey(public)
-	data := pem.EncodeToMemory(&b)
-	s := base64.StdEncoding.EncodeToString(data)
-	return s
-}
-
-// Expecting base64-encoded single PEM block containing public key
-func (r *RSA) B64toPublicKey(s string) (interface{}, error) {
-	pubkey, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return nil, err
-	}
-	p, _ := pem.Decode(pubkey)
-
-	if p != nil && p.Type == "PUBLIC KEY" {
-		pub, err := x509.ParsePKIXPublicKey(p.Bytes)
-		if err != nil {
-			return nil, err
-		}
-		return pub.(*rsa.PublicKey), nil
-	}
-	return nil, errors.New("No Public Key Found.")
-}
-
 /*
+EncryptMessage : Encrypts a message
 	1) generate aes key (32 random bytes)
    	2) encrypt the message with aes key
    	3) sha256 the encrypted message
@@ -143,10 +173,10 @@ func (r *RSA) B64toPublicKey(s string) (interface{}, error) {
    	5) encrypt the header with rsa
    	6) PEM encode encrypted header and encrypted message -> return
 */
-func (r *RSA) EncryptMessage(clear []byte, pubkey interface{}) ([]byte, error) {
-	public, ok := pubkey.(*rsa.PublicKey)
+func (r *KeyPair) EncryptMessage(clear []byte, pubkey bc.PubKey) ([]byte, error) {
+	public, ok := pubkey.(*PubKey)
 	if !ok {
-		log.Fatal("*rsa.PublicKey type assertion failed - your code is broken.")
+		log.Fatal("KeyPair.EncryptMessage requires an PubKey, not some different kind of key")
 	}
 
 	key := make([]byte, 32)
@@ -154,7 +184,7 @@ func (r *RSA) EncryptMessage(clear []byte, pubkey interface{}) ([]byte, error) {
 		return nil, err
 	}
 
-	ciphertext, err := aesEncrypt(clear, key)
+	ciphertext, err := bc.AesEncrypt(clear, key)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +204,7 @@ func (r *RSA) EncryptMessage(clear []byte, pubkey interface{}) ([]byte, error) {
 	copy(header[32+32:], hdrsum)
 
 	label := []byte("")
-	enchdr, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, public, header, label)
+	enchdr, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, public.pubkey, header, label)
 	if err != nil {
 		return nil, err
 	}
@@ -191,13 +221,14 @@ func (r *RSA) EncryptMessage(clear []byte, pubkey interface{}) ([]byte, error) {
 }
 
 /*
+DecryptMessage : Decrypts a message
 1) PEM decode header and body
 2) decrypt header
 3) verify the header signature
 4) verify the msg signature
 5) decrypt the msg
 */
-func (r *RSA) DecryptMessage(data []byte) ([]byte, error) {
+func (r *KeyPair) DecryptMessage(data []byte) ([]byte, error) {
 
 	h, rest := pem.Decode(data)
 	t, _ := pem.Decode(rest)
@@ -229,9 +260,23 @@ func (r *RSA) DecryptMessage(data []byte) ([]byte, error) {
 		return nil, errors.New("Invalid message - message checksum failed")
 	}
 
-	clear, err := aesDecrypt(t.Bytes, header[:32])
+	clear, err := bc.AesDecrypt(t.Bytes, header[:32])
 	if err != nil {
 		return nil, err
 	}
 	return clear, nil
+}
+
+// ValidatePubKey : Returns true if and only if the argument is a valid PubKey to this KeyPair
+func (r *KeyPair) ValidatePubKey(s string) bool {
+	pk := new(PubKey)
+	if err := pk.FromB64(s); err != nil || pk.pubkey == nil {
+		return false
+	}
+	return true
+}
+
+// Clone : Returns a new node of the same type as this one
+func (r *KeyPair) Clone() bc.KeyPair {
+	return new(KeyPair)
 }
