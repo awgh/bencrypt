@@ -1,0 +1,3 @@
+package bencrypt
+
+func BenCrypt() {}
