@@ -19,28 +19,56 @@
     </section>
 
     <section class="main-content">
-      <h3>
-<a id="what-is-bencrypt" class="anchor" href="#what-is-bencrypt" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>What is Bencrypt?</h3>
+      <h1>
+<a id="what-is-bencrypt" class="anchor" href="#what-is-bencrypt" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>What is Bencrypt?</h1>
 
-<p>Bencrypt is an abstraction layer for cryptosystems in Go, that lets applications use hybrid cryptosystems without being coupled to their internal workings.  It lets applications easily switch between using ECC or RSA, for example.  </p>
+<p>Bencrypt is an abstraction layer for cryptosystems in Go, that lets applications use hybrid cryptosystems without being coupled to their internal workings. It lets applications easily switch between using ECC or RSA, for example.</p>
 
 <p>Implementations of both ECC-based and RSA-based systems are included, as are a collection of generally-useful crypto utilities, such as:</p>
 
-<ul>
-<li>PKCS7 Padding/Unpadding</li>
-<li>AES symmetric encrypt/decrypt</li>
-<li>SSL Certificate Generation in both RSA and ECC modes</li>
-</ul>
+<pre><code>- PKCS7 Padding/Unpadding
+- AES-CBC symmetric encrypt/decrypt
+- SSL Certificate Generation in both RSA and ECC modes
+</code></pre>
 
 <p>Bencrypt was developed to provide a layer of abstraction for cryptosystems below the <a href="https://github.com/awgh/ratnet">ratnet project</a>.</p>
 
-<h3>
-<a id="documentation" class="anchor" href="#documentation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Documentation</h3>
+<h1>
+<a id="documentation" class="anchor" href="#documentation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Documentation</h1>
 
-<p><a href="https://godoc.org/github.com/awgh/bencrypt">API Docs are here</a></p>
+<p>API Docs are availble here: <a href="https://godoc.org/github.com/awgh/bencrypt">https://godoc.org/github.com/awgh/bencrypt</a></p>
 
-<h3>
-<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+<h1>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Usage</h1>
+
+<p>In normal usage, you will want to include at least two packages:</p>
+
+<ul>
+<li>"bencrypt/bc" - This contains the API and interfaces, you'll need this every time</li>
+</ul>
+
+<p>Then, include each cryptosystem definition that you want to use.  Two of them are included with bencrypt at the moment:</p>
+
+<ul>
+<li>"bencrypt/ecc" - A hybrid cryptosystem using Curve25519, AES-CBC-256, and HMAC-SHA-256.</li>
+<li>"bencrypt/rsa" - A hybrid cryptosystem using RSA-4096, AES-CBC-256, and HMAC-SHA-256.</li>
+</ul>
+
+<h1>
+<a id="add-your-own-cryptosystem" class="anchor" href="#add-your-own-cryptosystem" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Add Your Own CryptoSystem</h1>
+
+<p>To add your own cryptosystem to bencrypt:</p>
+
+<ul>
+<li>Make a new package and include "bencrypt/bc".</li>
+<li>Create an implementation of <a href="https://godoc.org/github.com/awgh/bencrypt/bc#PubKey">bc.PubKey</a> for your system.</li>
+<li>Create an implementation of <a href="https://godoc.org/github.com/awgh/bencrypt/bc#KeyPair">bc.KeyPair</a> for your system.</li>
+</ul>
+
+<p>Then, to use it, just include your system instead of "bencrypt/ecc" or "bencrypt/rsa" in your app.</p>
+
+<h1>
+<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h1>
 
 <p><a href="mailto:awgh@awgh.org">awgh@awgh.org</a> (<a href="https://github.com/awgh" class="user-mention">@awgh</a>)</p>
 
