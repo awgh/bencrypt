@@ -36,6 +36,11 @@ To add your own cryptosystem to bencrypt:
 	
 Then, to use it, just include your system instead of "bencrypt/ecc" or "bencrypt/rsa" in your app.
 
+# Related Projects
+
+- [Bencrypt, crypto abstraction layer & utils](https://github.com/awgh/bencrypt)
+- [Ratnet, onion-routed messaging system with pluggable transports](https://github.com/awgh/ratnet)
+- [HushCom, simple IRC-like client & server](https://github.com/awgh/hushcom)
 
 # Authors and Contributors
 awgh@awgh.org (@awgh)
