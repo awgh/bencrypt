@@ -35,8 +35,17 @@ import (
 	"io"
 	"log"
 
+	"github.com/awgh/bencrypt"
 	"github.com/awgh/bencrypt/bc"
 )
+
+var (
+	NAME = "RSA-4096,AES-CBC-256,HMAC-SHA-256"
+)
+
+func init() {
+	bencrypt.KeypairTypes[NAME] = func() bc.KeyPair { return new(KeyPair) }
+}
 
 // PubKey : Implements bc.PubKey interface
 type PubKey struct {
@@ -97,7 +106,7 @@ type KeyPair struct {
 
 // GetName : Returns the common language name for this cryptosystem
 func (r *KeyPair) GetName() string {
-	return "RSA-4096,AES-CBC-256,HMAC-SHA-256"
+	return NAME
 }
 
 // GetPubKey : Returns the Public portion of this KeyPair

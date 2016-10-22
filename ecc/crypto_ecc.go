@@ -9,12 +9,15 @@ import (
 	"io"
 	"log"
 
+	"github.com/awgh/bencrypt"
 	"github.com/awgh/bencrypt/bc"
 
 	"golang.org/x/crypto/curve25519"
 )
 
 var (
+	NAME = "Curve25519,AES-CBC-256,HMAC-SHA-256"
+
 	//1ef17714-dbbf-4d1c-8869-e8273e2c327a
 	aesKeyLabel = []byte{
 		0x1e, 0xf1, 0x77, 0x14, 0xdb, 0xbf, 0x4d, 0x1c,
@@ -30,6 +33,10 @@ var (
 type PubKey struct {
 	pubkey []byte //len=32
 
+}
+
+func init() {
+	bencrypt.KeypairTypes[NAME] = func() bc.KeyPair { return new(KeyPair) }
 }
 
 // ToB64 : Returns Public Key as a Base64 encoded string
@@ -78,7 +85,7 @@ type KeyPair struct {
 
 // GetName : Returns the common language name for this cryptosystem
 func (e *KeyPair) GetName() string {
-	return "Curve25519,AES-CBC-256,HMAC-SHA-256"
+	return NAME
 }
 
 // GetPubKey : Returns the Public portion of this KeyPair
@@ -86,7 +93,7 @@ func (e *KeyPair) GetPubKey() bc.PubKey {
 	return e.pubkey
 }
 
-// Precompute : This does nothing in KeyPair
+// Precompute : This does nothing in ECC
 func (e *KeyPair) Precompute() {
 }
 
