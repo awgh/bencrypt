@@ -9,8 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 
 	"golang.org/x/crypto/hkdf"
+
+	"github.com/rainycape/vfs"
 )
 
 // GenerateRandomBytes : Generates as many random bytes as you ask for, returns them as []byte
@@ -114,4 +118,97 @@ func AesDecrypt(ciphertext, aesKey []byte) ([]byte, error) {
 	clear, _ = Pkcs7Unpad(clear, aes.BlockSize)
 
 	return clear, nil
+}
+
+// OpenAndDecrypt returns an in-memory VFS initialized with the contents
+// of the given filename, which will be decrypted with the given AES key,
+//  and which must have one of the following fileTypes:
+//
+//  - .zip
+//  - .tar
+//  - .tar.gz
+//  - .tar.bz2
+func OpenAndDecrypt(filename string, fileType string, aesKey []byte) (vfs.VFS, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	clear, err := AesDecrypt(b, aesKey)
+	if err != nil {
+		return nil, err
+	}
+	bb := bytes.NewBuffer(clear)
+	switch fileType {
+	case ".zip":
+		return vfs.Zip(bb, int64(bb.Len()))
+	case ".tar":
+		return vfs.Tar(bb)
+	case ".tar.gz":
+		return vfs.TarGzip(bb)
+	case ".tar.bz2":
+		return vfs.TarBzip2(bb)
+	}
+	return nil, fmt.Errorf("can't open a VFS from a %s file", fileType)
+}
+
+// SaveAndEncrypt converts the given VFS to the given archive type,
+// and then encrypts the archive with the given AES key.
+// Supported fileTypes:
+//
+//  - .zip
+//  - .tar
+//  - .tar.gz
+//  TODO: NOT SUPPORTED - .tar.bz2
+func SaveAndEncrypt(fs vfs.VFS, outfile string, fileType string, aesKey []byte) error {
+	bb := bytes.NewBuffer(nil)
+	switch fileType {
+	case ".zip":
+		if err := vfs.WriteZip(bb, fs); err != nil {
+			return err
+		}
+	case ".tar":
+		if err := vfs.WriteTar(bb, fs); err != nil {
+			return err
+		}
+	case ".tar.gz":
+		if err := vfs.WriteTarGzip(bb, fs); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("can't write a VFS to a %s file", fileType)
+	}
+	cipher, err := AesEncrypt(bb.Bytes(), aesKey)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(outfile, cipher, 0600); err != nil {
+		return err
+	}
+	return nil
+}
+
+// EncryptFile will encrypt clearfile with aesKey and save it to outfile
+func EncryptFile(clearfile string, outfile string, aesKey []byte) error {
+	f, err := os.Open(clearfile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	clear, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	cipher, err := AesEncrypt(clear, aesKey)
+	if err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(outfile, cipher, 0600); err != nil {
+		return err
+	}
+	return nil
 }
