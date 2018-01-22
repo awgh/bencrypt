@@ -9,7 +9,7 @@ type KeyPair interface {
 	FromB64(s string) error
 
 	EncryptMessage(clear []byte, pubkey PubKey) ([]byte, error)
-	DecryptMessage(data []byte) ([]byte, error)
+	DecryptMessage(data []byte) (bool, []byte, error)
 
 	GetName() string
 	GetPubKey() PubKey

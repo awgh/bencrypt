@@ -57,15 +57,16 @@ func Test_EncryptDecrypt_ECC(t *testing.T) {
 		t.Error(err.Error())
 	}
 	pubkey := new(PubKey)
-	if err := pubkey.FromB64(pubkeyb64Ecc); err != nil {
+	err = pubkey.FromB64(pubkeyb64Ecc)
+	if err != nil {
 		t.Error(err.Error())
 	}
 	ciphertext, err := eccCrypt.EncryptMessage(cleartext, pubkey)
 	if err != nil {
 		t.Error(err.Error())
 	}
-	recovered, err := eccCrypt.DecryptMessage(ciphertext)
-	if err != nil {
+	tagOK, recovered, err := eccCrypt.DecryptMessage(ciphertext)
+	if !tagOK || err != nil {
 		t.Error(err.Error())
 	}
 
@@ -83,4 +84,5 @@ func Test_EncryptDecrypt_ECC(t *testing.T) {
 // ECC TEST KEYS
 var pubprivkeyb64Ecc = "Tcksa18txiwMEocq7NXdeMwz6PPBD+nxCjb/WCtxq1+dln3M3IaOmg+YfTIbBpk+jIbZZZiT+4CoeFzaJGEWmg=="
 var pubkeyb64Ecc = "Tcksa18txiwMEocq7NXdeMwz6PPBD+nxCjb/WCtxq18="
-var privkeyb64Ecc = "nZZ9zNyGjpoPmH0yGwaZPoyG2WWYk/uAqHhc2iRhFpo="
+
+//var privkeyb64Ecc = "nZZ9zNyGjpoPmH0yGwaZPoyG2WWYk/uAqHhc2iRhFpo="

@@ -73,17 +73,6 @@ func Kdf(key []byte, label, salt []byte) ([]byte, error) {
 	return derivedKey, nil
 }
 
-// DestHash : Makes a hash out of a destination PubKey and a salt
-func DestHash(pubkey PubKey, salt []byte) ([]byte, error) {
-	pk := pubkey.ToBytes()
-
-	h, err := Kdf(pk, pk, salt)
-	if err != nil {
-		return nil, err
-	}
-	return h, nil
-}
-
 // AesEncrypt : Encrypt some bytes with a given key using AES-CBC-aes.BlockSize
 func AesEncrypt(clear, aesKey []byte) ([]byte, error) {
 	clear, _ = Pkcs7Pad(clear, aes.BlockSize)
