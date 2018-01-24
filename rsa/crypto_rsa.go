@@ -40,6 +40,7 @@ import (
 )
 
 var (
+	// NAME - human-readable name of this Crypto implementation
 	NAME = "RSA-4096,AES-CBC-256,HMAC-SHA-256"
 )
 
@@ -118,12 +119,13 @@ func (r *KeyPair) GetPubKey() bc.PubKey {
 func (r *KeyPair) Precompute() {
 	keybytes, _ := x509.MarshalPKIXPublicKey(r.privkey)
 	sha := sha256.New()
-	sha.Write(keybytes)
+	if _, err := sha.Write(keybytes); err != nil {
+		log.Fatal(err.Error())
+	}
 	r.keyHash = sha.Sum(nil)
 
 	r.privkey.Precompute()
-	err := r.privkey.Validate()
-	if err != nil {
+	if err := r.privkey.Validate(); err != nil {
 		log.Fatal(err.Error())
 	}
 
@@ -170,7 +172,7 @@ func (r *KeyPair) FromB64(s string) error {
 		r.Precompute()
 		return nil
 	}
-	return errors.New("No Private Key Found.")
+	return errors.New("No Private Key Found")
 }
 
 /*
@@ -187,26 +189,35 @@ func (r *KeyPair) EncryptMessage(clear []byte, pubkey bc.PubKey) ([]byte, error)
 	if !ok {
 		log.Fatal("KeyPair.EncryptMessage requires an PubKey, not some different kind of key")
 	}
-
+	// 1) generate aes key (32 random bytes)
 	key := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
 		return nil, err
 	}
-
+	// 2) encrypt the message with aes key
 	ciphertext, err := bc.AesEncrypt(clear, key)
 	if err != nil {
 		return nil, err
 	}
-
+	// 3) sha256 the encrypted message
 	sha := sha256.New()
-	sha.Write(ciphertext)
+	_, err = sha.Write(ciphertext)
+	if err != nil {
+		return nil, err
+	}
 	msgsum := sha.Sum(nil)
-
+	// 4) sha256 the key and msg hash
 	sha.Reset()
-	sha.Write(key)
-	sha.Write(msgsum)
+	_, err = sha.Write(key)
+	if err != nil {
+		return nil, err
+	}
+	_, err = sha.Write(msgsum)
+	if err != nil {
+		return nil, err
+	}
 	hdrsum := sha.Sum(nil)
-
+	// 5) encrypt the header with rsa
 	header := make([]byte, 32+32+32)
 	copy(header, key)
 	copy(header[32:], msgsum)
@@ -237,43 +248,49 @@ DecryptMessage : Decrypts a message
 4) verify the msg signature
 5) decrypt the msg
 */
-func (r *KeyPair) DecryptMessage(data []byte) ([]byte, error) {
+func (r *KeyPair) DecryptMessage(data []byte) (bool, []byte, error) {
 
 	h, rest := pem.Decode(data)
 	t, _ := pem.Decode(rest)
 	if h == nil || t == nil {
-		return nil, errors.New("Invalid message - header or body missing")
+		return false, nil, errors.New("Invalid message - header or body missing")
 	}
 
 	label := []byte("")
 	header, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, r.privkey, h.Bytes, label)
 	if err != nil {
-		return nil, err
+		return false, nil, err
 	}
 
 	sha := sha256.New()
-	sha.Write(header[:32+32])
+	_, err = sha.Write(header[:32+32])
+	if err != nil {
+		return false, nil, err
+	}
 	hdrsum := sha.Sum(nil)
 
 	x := subtle.ConstantTimeCompare(hdrsum, header[32+32:])
 	if x != 1 {
-		return nil, errors.New("Invalid message - header checksum failed")
+		return false, nil, errors.New("Invalid message - header checksum failed")
 	}
 
 	sha.Reset()
-	sha.Write(t.Bytes)
+	_, err = sha.Write(t.Bytes)
+	if err != nil {
+		return false, nil, err
+	}
 	msgsum := sha.Sum(nil)
 
 	x = subtle.ConstantTimeCompare(msgsum, header[32:32+32])
 	if x != 1 {
-		return nil, errors.New("Invalid message - message checksum failed")
+		return false, nil, errors.New("Invalid message - message checksum failed")
 	}
 
 	clear, err := bc.AesDecrypt(t.Bytes, header[:32])
 	if err != nil {
-		return nil, err
+		return false, nil, err
 	}
-	return clear, nil
+	return true, clear, nil
 }
 
 // ValidatePubKey : Returns true if and only if the argument is a valid PubKey to this KeyPair
