@@ -50,7 +50,7 @@ func init() {
 
 // PubKey : Implements bc.PubKey interface
 type PubKey struct {
-	pubkey *rsa.PublicKey
+	Pubkey *rsa.PublicKey
 }
 
 // ToB64 : Returns Public Key as a Base64 encoded string
@@ -71,7 +71,7 @@ func (e *PubKey) FromB64(s string) error {
 func (e *PubKey) ToBytes() []byte {
 	var b pem.Block
 	b.Type = "PUBLIC KEY"
-	b.Bytes, _ = x509.MarshalPKIXPublicKey(e.pubkey)
+	b.Bytes, _ = x509.MarshalPKIXPublicKey(e.Pubkey)
 	data := pem.EncodeToMemory(&b)
 	return data
 }
@@ -84,8 +84,8 @@ func (e *PubKey) FromBytes(b []byte) error {
 		if err != nil {
 			return err
 		}
-		e.pubkey = pub.(*rsa.PublicKey)
-		if e.pubkey == nil {
+		e.Pubkey = pub.(*rsa.PublicKey)
+		if e.Pubkey == nil {
 			return errors.New("Nil Public Key in PubKey.FromBytes")
 		}
 		return nil
@@ -132,7 +132,7 @@ func (r *KeyPair) Precompute() {
 	if r.pubkey == nil {
 		r.pubkey = new(PubKey)
 	}
-	r.pubkey.pubkey = &r.privkey.PublicKey
+	r.pubkey.Pubkey = &r.privkey.PublicKey
 }
 
 // GenerateKey : Generates a new keypair inside this KeyPair object
@@ -224,7 +224,7 @@ func (r *KeyPair) EncryptMessage(clear []byte, pubkey bc.PubKey) ([]byte, error)
 	copy(header[32+32:], hdrsum)
 
 	label := []byte("")
-	enchdr, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, public.pubkey, header, label)
+	enchdr, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, public.Pubkey, header, label)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func (r *KeyPair) DecryptMessage(data []byte) (bool, []byte, error) {
 // ValidatePubKey : Returns true if and only if the argument is a valid PubKey to this KeyPair
 func (r *KeyPair) ValidatePubKey(s string) bool {
 	pk := new(PubKey)
-	if err := pk.FromB64(s); err != nil || pk.pubkey == nil {
+	if err := pk.FromB64(s); err != nil || pk.Pubkey == nil {
 		return false
 	}
 	return true

@@ -38,7 +38,7 @@ var (
 
 // PubKey : Implements bc.PubKey interface
 type PubKey struct {
-	pubkey []byte //len=32
+	Pubkey []byte //len=32
 }
 
 func init() {
@@ -47,7 +47,7 @@ func init() {
 
 // ToB64 : Returns Public Key as a Base64 encoded string
 func (e *PubKey) ToB64() string {
-	return base64.StdEncoding.EncodeToString(e.pubkey)
+	return base64.StdEncoding.EncodeToString(e.Pubkey)
 }
 
 // FromB64 : Sets Public Key from a Base64 encoded string
@@ -59,13 +59,13 @@ func (e *PubKey) FromB64(s string) error {
 	if len(pk) != 32 {
 		return errors.New("Key array wrong size in PubKey.FromB64")
 	}
-	e.pubkey = pk
+	e.Pubkey = pk
 	return nil
 }
 
 // ToBytes : Returns Public Key as bytes
 func (e *PubKey) ToBytes() []byte {
-	return e.pubkey
+	return e.Pubkey
 }
 
 // FromBytes : Sets Public Key from bytes
@@ -73,7 +73,7 @@ func (e *PubKey) FromBytes(b []byte) error {
 	if len(b) != 32 {
 		return errors.New("Key array wrong size in PubKey.FromBytes")
 	}
-	e.pubkey = b
+	e.Pubkey = b
 	return nil
 }
 
@@ -289,7 +289,7 @@ func (e *KeyPair) DecryptMessage(data []byte) (bool, []byte, error) {
 // ValidatePubKey : Returns true if and only if the argument is a valid PubKey to this KeyPair
 func (e *KeyPair) ValidatePubKey(s string) bool {
 	pk := new(PubKey)
-	if err := pk.FromB64(s); err != nil || pk.pubkey == nil || len(pk.pubkey) != 32 {
+	if err := pk.FromB64(s); err != nil || pk.Pubkey == nil || len(pk.Pubkey) != 32 {
 		return false
 	}
 	return true
