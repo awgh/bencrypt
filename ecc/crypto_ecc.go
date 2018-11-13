@@ -82,6 +82,11 @@ func (e *PubKey) Clone() bc.PubKey {
 	return new(PubKey)
 }
 
+// Nil : Returns the interface-to-nil-pointer type for this PubKey
+func (e *PubKey) Nil() interface{} {
+	return (*PubKey)(nil)
+}
+
 // KeyPair for ECC : Bencrypt Implementation of a Curve25519,AES-CBC-256,HMAC-SHA-256 system
 type KeyPair struct {
 	privkey [32]byte //len=32

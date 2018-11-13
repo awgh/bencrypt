@@ -98,6 +98,11 @@ func (e *PubKey) Clone() bc.PubKey {
 	return new(PubKey)
 }
 
+// Nil : Returns the interface-to-nil-pointer type for this PubKey
+func (e *PubKey) Nil() interface{} {
+	return (*PubKey)(nil)
+}
+
 // KeyPair for RSA : Bencrypt Implementation of a RSA-4096,AES-CBC-256,HMAC-SHA-256 system
 type KeyPair struct {
 	privkey *rsa.PrivateKey

@@ -28,4 +28,5 @@ type PubKey interface {
 	FromBytes([]byte) error
 
 	Clone() PubKey
+	Nil() interface{}
 }
