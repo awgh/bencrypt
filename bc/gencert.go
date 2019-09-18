@@ -11,6 +11,7 @@
 package bc
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -19,7 +20,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"net"
 	"os"
@@ -63,7 +63,7 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 }
 
 // InitSSL : Generate you some SSL cert/key, only if the named files don't exist
-func InitSSL(certfile string, keyfile string, useECC bool) {
+func InitSSL(certfile string, keyfile string, useECC bool) error {
 	haveCert := true
 	if _, err := os.Stat(keyfile); os.IsNotExist(err) {
 		haveCert = false
@@ -72,12 +72,45 @@ func InitSSL(certfile string, keyfile string, useECC bool) {
 		haveCert = false
 	}
 	if !haveCert {
-		GenerateSSLCert(certfile, keyfile, useECC)
+		err := GenerateSSLCert(certfile, keyfile, useECC)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // GenerateSSLCert : Generate you some SSL cert/key
-func GenerateSSLCert(certfile string, keyfile string, eccMode bool) {
+func GenerateSSLCert(certfile string, keyfile string, eccMode bool) error {
+	certBytes, keyBytes, err := GenerateSSLCertBytes(eccMode)
+	if err != nil {
+		return fmt.Errorf("error generating cert: %v", err)
+	}
+
+	certOut, err := os.Create(certfile)
+	defer certOut.Close()
+	if err != nil {
+		return fmt.Errorf("failed to open %s for writing: %v", certfile, err)
+	}
+	if _, err = certOut.Write(certBytes); err != nil {
+		return fmt.Errorf("error writing %s: %v", certfile, err)
+	}
+
+	keyOut, err := os.OpenFile(keyfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	defer keyOut.Close()
+	if err != nil {
+		return fmt.Errorf("failed to open %s for writing: %v", keyfile, err)
+	}
+	if _, err = keyOut.Write(keyBytes); err != nil {
+		return fmt.Errorf("error writing %s: %v", keyfile, err)
+	}
+
+	return nil
+}
+
+// GenerateSSLCertBytes : Generate you some SSL cert/key bytes
+func GenerateSSLCertBytes(eccMode bool) ([]byte, []byte, error) {
 	var priv interface{}
 	var err error
 	if eccMode {
@@ -86,7 +119,7 @@ func GenerateSSLCert(certfile string, keyfile string, eccMode bool) {
 		priv, err = rsa.GenerateKey(rand.Reader, rsaBits)
 	}
 	if err != nil {
-		log.Fatalf("failed to generate private key: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate private key: %s", err)
 	}
 
 	var notBefore time.Time
@@ -95,8 +128,7 @@ func GenerateSSLCert(certfile string, keyfile string, eccMode bool) {
 	} else {
 		notBefore, err = time.Parse("Jan 2 15:04:05 2006", validFrom)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to parse creation date: %s\n", err)
-			os.Exit(1)
+			return nil, nil, fmt.Errorf("Failed to parse creation date: %s", err)
 		}
 	}
 
@@ -105,7 +137,7 @@ func GenerateSSLCert(certfile string, keyfile string, eccMode bool) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		log.Fatalf("failed to generate serial number: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
 	}
 
 	template := x509.Certificate{
@@ -137,23 +169,18 @@ func GenerateSSLCert(certfile string, keyfile string, eccMode bool) {
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %s", err)
+		return nil, nil, fmt.Errorf("failed to create certificate: %s", err)
 	}
 
-	certOut, err := os.Create(certfile)
-	if err != nil {
-		log.Fatalf("failed to open "+certfile+" for writing: %s", err)
+	var certBuf bytes.Buffer
+	if err = pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
+		return nil, nil, fmt.Errorf("error encoding cert: %v", err)
 	}
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	certOut.Close()
-	log.Println("written", certfile)
 
-	keyOut, err := os.OpenFile(keyfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Print("failed to open "+keyfile+" for writing:", err)
-		return
+	var keyBuf bytes.Buffer
+	if err = pem.Encode(&keyBuf, pemBlockForKey(priv)); err != nil {
+		return nil, nil, fmt.Errorf("error encoding key: %v", err)
 	}
-	pem.Encode(keyOut, pemBlockForKey(priv))
-	keyOut.Close()
-	log.Println("written", keyfile)
+
+	return certBuf.Bytes(), keyBuf.Bytes(), nil
 }
